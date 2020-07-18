@@ -11,6 +11,10 @@ namespace TML
 {
     public partial class Launcher : Form
     {
+
+        int[] allInstances = new int[32];
+        byte curInstance = 0;
+        int GameInstanceNotHeadless;
         public Launcher()
         {
             InitializeComponent();
@@ -18,103 +22,161 @@ namespace TML
             gameOriginal.Checked = true;
 
         }
-
+        public bool batchmode = false;
         public bool mods = false;
         public string gamePath = "";
-
-        private void launch_Click(object sender, EventArgs e)
+        private bool check_path()
         {
+
             try
             {
-                gamePath = File.ReadAllText(Path.GetTempPath() + @"tmlsettings.txt");
+                if (File.Exists(Path.GetTempPath() + @"tmlsettings.txt"))
                 {
-                    if (!System.IO.Directory.Exists(gamePath))
+
+                    gamePath = File.ReadAllText(Path.GetTempPath() + @"tmlsettings.txt");
+                    return true;
+                }
+                else
+                {
+                    gamePath = @"C:/Program Files (x86)/Steam/steamapps/common/TotallyAccurateBattlegrounds";
+
+                    if (System.IO.File.Exists(Path.Combine(gamePath,"TotallyAccurateBattlegrounds.exe")))
                     {
+                        MessageBox.Show("Found TABG install directory.");
+                        File.WriteAllText(Path.GetTempPath() + @"tmlsettings.txt", gamePath);
+                        return true;
 
-
-                        string filePath = openFileDialog1.InitialDirectory = "C:\\Program Files(x86)\\Steam\\steamapps\\common\\TotallyAccurateBattlegrounds";
+                    }
+                    else
+                    {
+                        string filePath = openFileDialog1.InitialDirectory = @"C:/Program Files (x86)/Steam/steamapps/common/TotallyAccurateBattlegrounds";
                         openFileDialog1.Filter = "TABG Executable|TotallyAccurateBattlegrounds.exe";
 
                         if (openFileDialog1.ShowDialog() == DialogResult.OK)
                         {
                             gamePath = openFileDialog1.FileName;
                             gamePath = Path.GetDirectoryName(gamePath);
-                            File.WriteAllText(Path.GetTempPath() + @"tmlsettings.txt", gamePath);
+                            if (Directory.Exists(gamePath))
+                            {
+                                File.WriteAllText(Path.GetTempPath() + @"tmlsettings.txt", gamePath);
+                                return true;
+                            }
+                            else
+                            {
+                                MessageBox.Show("Game path was not found, though it was read (incorrectly?) from tmlsettings.txt file.", "Error");
+                                return false;
+                            }
 
+                   
                         }
+                        return false;
                     }
                 }
-                launch.Enabled = true;
-                if (gameOriginal.Checked)
-                {
-                    mods = false;
-                }
-                else
-                {
-                    mods = true;
-                }
             }
-            catch
-            { }
-
-            try
+            catch (Exception ex)
             {
-                if (File.Exists(Path.GetTempPath() + @"dl.dll"))
-                {
-                    File.Delete(Path.GetTempPath() + @"dl.dll");
-                }
-
-                if (mods)
-                {
-                    DownloadFile(@"http://github.com/Audixas/TabgGunGame/raw/master/Assembly-CSharp.dll", Path.GetTempPath() + @"dl.dll");
-                }
-                else
-                {
-                    DownloadFile(@"http://github.com/Audixas/TabgGunGame/raw/master/latest.dll", Path.GetTempPath() + @"dl.dll");
-                }
-
-                gamePath = System.IO.File.ReadAllText(Path.GetTempPath() + @"tmlsettings.txt").ToString();
+                MessageBox.Show(ex.ToString(), "Something went wrong.");
+                return false;
             }
-            catch (Exception excp1)
+
+
+
+        }
+        private void launch_Click(object sender, EventArgs e)
+        {
+            if (!check_path())
             {
-                MessageBox.Show(excp1.ToString(), "Frickin heck. Report this to the Discord!", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("Something went wrong.", "Error");
+                return;
+            }
+            bool no_update = false;
+            if (Control.ModifierKeys == Keys.Control)
+            {
+                no_update = true;
+            }
+
+            launch.Enabled = true;
+            if (gameOriginal.Checked)
+            {
+                launch_game(false, false, no_update);
+            }
+            else
+            {
+                launch_game(true, false, no_update);
             }
         }
+        public void launch_game(bool modded, bool batchmode, bool no_update)
+        {
 
+            if (no_update)
+            {
+                if (batchmode)
+                {
+                    try
+                    {
+                        allInstances[curInstance] = System.Diagnostics.Process.Start(Path.Combine(gamePath, @"TotallyAccurateBattlegrounds.exe"), "-batchmode").Id;
+                        return;
+                    }
+                    catch (Exception e)
+                    {
+                        MessageBox.Show(e.ToString(), "Something went wrong.");
+                    }
+
+                }
+                else
+                {
+                    try
+                    {
+                        allInstances[curInstance] = System.Diagnostics.Process.Start(Path.Combine(gamePath, @"TotallyAccurateBattlegrounds.exe")).Id;
+                        return;
+                    }
+                    catch (Exception e)
+                    {
+                        MessageBox.Show(e.ToString(), "Something went wrong.");
+                    }
+
+                }
+            }
+            else
+            {
+                try
+                {
+                    if (File.Exists(Path.GetTempPath() + @"dl.dll"))
+                    {
+                        File.Delete(Path.GetTempPath() + @"dl.dll");
+                    }
+                    if (batchmode)
+                    {
+                        allInstances[curInstance] = System.Diagnostics.Process.Start(Path.Combine(gamePath, @"TotallyAccurateBattlegrounds.exe"), "-batchmode").Id;
+                        curInstance++;
+
+                    }
+                    else if (modded)
+                    {
+                        DownloadFile(@"http://github.com/Audixas/TabgGunGame/raw/master/Assembly-CSharp.dll", Path.GetTempPath() + @"dl.dll");
+                    }
+                    else
+                    {
+                        DownloadFile(@"http://github.com/Audixas/TabgGunGame/raw/master/latest.dll", Path.GetTempPath() + @"dl.dll");
+                    }
+
+                    gamePath = System.IO.File.ReadAllText(Path.GetTempPath() + @"tmlsettings.txt").ToString();
+                }
+                catch (Exception excp1)
+                {
+                    MessageBox.Show(excp1.ToString(), "Something went wrong, ask miley about this on the Discord!", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+        }
         private void Launcher_Load(object sender, EventArgs e)
         {
-            if (System.IO.File.Exists((Path.GetTempPath() + @"tmlsettings.txt")))
-                gamePath = File.ReadAllText(Path.GetTempPath() + @"tmlsettings.txt");
+            if (check_path())
+                installDirectory.Text = gamePath;
             else
-
-            {
-                gamePath = "";
-                MessageBox.Show("Game directory not found. You probably have a non-standard Steam install directory. Choose the location where TABG is installed.", "Game directory not found", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-
-                openFileDialog1.Filter = "TABG Executable|TotallyAccurateBattlegrounds.exe";
-                gamePath = openFileDialog1.InitialDirectory;
-
-                if (openFileDialog1.ShowDialog() == DialogResult.OK)
-                {
-
-
-                    gamePath = openFileDialog1.FileName;
-                    gamePath = Path.GetDirectoryName(gamePath);
-                    File.WriteAllText(Path.GetTempPath() + @"tmlsettings.txt", gamePath);
-
-                }
-            }
-            installDirectory.Text = gamePath;
+                MessageBox.Show("Failed to find the game directory.", "Error");
         }
 
-        private void Button2_Click(object sender, EventArgs e)
-        {
-            // File.Delete(Path.GetTempPath() + @"\.TML");
-            System.Diagnostics.Process.Start(Directory.GetCurrentDirectory() + @"\TML.exe");
-            Application.Exit();
-        }
-
-        public void DownloadFile(string urlAddress, string location)
+          public void DownloadFile(string urlAddress, string location)
         {
             using (WebClient webClient = new WebClient())
             {
@@ -148,7 +210,9 @@ namespace TML
         {
             if (e.Cancelled == true)
             {
+          
                 MessageBox.Show("Download has been canceled.");
+                
             }
             else
             {
@@ -156,26 +220,59 @@ namespace TML
                 {
                     System.IO.File.Copy(Path.GetTempPath() + @"dl.dll", gamePath + @"\TotallyAccurateBattlegrounds_Data\Managed\Assembly-CSharp.dll", true);
                     File.Delete(Path.GetTempPath() + @"dl.dll");
-                    try
-                    {
-                        System.Diagnostics.Process.Start(@"steam://rungameid/823130");
-                        Application.Exit();
-                    }
-                    catch
-                    {
-                        MessageBox.Show("Error :c", "Couldn't launch game.\nIs Steam installed?", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    }
+                    
                 }
                 catch (Exception x)
                 {
+                    
                     MessageBox.Show("Unable to copy DLL file\n" + x, "Error :c", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
+
+                try
+                {
+                    // System.Diagnostics.ProcessStartInfo processStartInfo = new System.Diagnostics.ProcessStartInfo(@"steam://rungameid/823130","-batchmode");
+
+                    allInstances[curInstance] = System.Diagnostics.Process.Start(Path.Combine(gamePath, @"TotallyAccurateBattlegrounds.exe")).Id;
+                    GameInstanceNotHeadless = allInstances[curInstance];
+                    curInstance++;
+        
+                 //   Application.Exit();
+                }
+                catch
+                {
+
+                    MessageBox.Show("Error :c", "Couldn't launch game.\nIs Steam installed?", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+
+
             }
         }
 
         private void discordButton_Click(object sender, EventArgs e)
         {
             System.Diagnostics.Process.Start("https://discord.gg/6Vex6wT");
+        }
+
+        private void launchHeadless_Click(object sender, EventArgs e)
+        {
+            launch_game(true, true, true);
+        }
+
+        private void killHeadless_Click(object sender, EventArgs e)
+        {
+            foreach (System.Diagnostics.Process proc in System.Diagnostics.Process.GetProcessesByName("TotallyAccurateBattlegrounds"))
+            {
+              //  foreach (int procID in allInstances)
+               // {
+              // 
+                if (proc.Id != GameInstanceNotHeadless)
+                   {
+                        proc.Kill();
+                 }
+
+             //   }
+
+            }
         }
     }
 }
